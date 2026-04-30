@@ -2,6 +2,7 @@ fastapi[standard]
 uvicorn[standard]
 python-dotenv
 sqlalchemy
-openai
+groq
 chromadb
 supabase
+pydantic
