@@ -6,18 +6,7 @@ files:
     destination: /usr/share/nginx/html
 
 hooks:
-
-  BeforeInstall:
-    - location: scripts/stop_server.sh
-      timeout: 300
-      runas: root
-
   AfterInstall:
-    - location: scripts/install_dependencies.sh
-      timeout: 300
-      runas: root
-
-  ApplicationStart:
-    - location: scripts/start_server.sh
+    - location: scripts/deploy.sh
       timeout: 300
       runas: root
