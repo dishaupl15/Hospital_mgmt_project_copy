@@ -1,19 +1,10 @@
 #!/bin/bash
 
-echo "=============================="
-echo "Installing Application"
-echo "=============================="
+yum update -y
 
-# Update packages
-sudo yum update -y
+yum install nginx -y
+yum install git -y
+yum install nodejs -y
 
-# Install nginx
-sudo yum install nginx -y
-
-# Start nginx
-sudo systemctl start nginx
-
-# Enable nginx
-sudo systemctl enable nginx
-
-echo "Nginx setup completed"
+systemctl start nginx
+systemctl enable nginx
