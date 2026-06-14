@@ -2,18 +2,225 @@
 
 An AI-powered health assessment system built with FastAPI, React, and Groq LLM.
 
-## Features
+## Overview
 
-- Multi-agent LLM pipeline for symptom analysis
-- Symptom-specific follow-up questions (cardiac, neurological, hepatic, etc.)
-- Risk assessment and recommendations
-- Patient report history
-- RAG-based medical knowledge retrieval
+Agentic Health Monitor is an AI-powered multi-agent clinical triage system that transforms user-reported symptoms into structured, explainable healthcare insights.
 
-## Tech Stack
+The system uses specialized AI agents to analyze symptoms, ask intelligent follow-up questions, assess risk levels, retrieve medical knowledge, and generate personalized recommendations.
 
-**Backend:** FastAPI, Groq (llama-3.3-70b-versatile), ChromaDB, SQLite, Pydantic  
-**Frontend:** React, Vite, Tailwind CSS
+Built for the Microsoft Agents League Hackathon under the **Reasoning Agents** category, the project demonstrates multi-agent orchestration, AI reasoning, Retrieval-Augmented Generation (RAG), and grounded healthcare intelligence.
+
+> Note: This system is designed for healthcare decision support and early triage assistance. It does not replace professional medical diagnosis.
+
+---
+
+# Problem Statement
+
+Healthcare users often struggle to understand symptoms and determine the urgency of seeking medical help.
+
+Traditional symptom checkers:
+- Provide generic responses
+- Lack contextual reasoning
+- Do not ask personalized follow-up questions
+- May generate unreliable medical information
+
+There is a need for an intelligent system that can reason through symptoms, gather missing context, assess risk, and provide explainable guidance.
+---
+
+# Solution
+
+Agentic Health Monitor solves this problem using a multi-agent AI architecture.
+
+The system divides healthcare reasoning into specialized agents:
+
+1. Symptom Analysis Agent
+   - Understands user symptoms
+   - Extracts important medical information
+   - Identifies affected body systems
+
+2. Clarification Agent
+   - Generates symptom-specific follow-up questions
+   - Collects missing information
+
+3. Medical Reasoning Agent
+   - Performs multi-step reasoning
+   - Maps symptoms with medical knowledge
+
+4. Risk Assessment Agent
+   - Evaluates severity
+   - Generates risk levels:
+     - Low
+     - Medium
+     - High
+
+5. Recommendation Agent
+   - Produces structured next-step guidance
+   - Provides safety recommendations
+
+---
+# Features
+
+## AI Multi-Agent Reasoning
+- Specialized agents collaborate to analyze healthcare scenarios
+- Each agent focuses on a specific reasoning task
+
+## Intelligent Follow-up Questions
+- Generates dynamic questions based on symptoms
+- Supports symptom categories such as:
+  - Cardiac
+  - Neurological
+  - Hepatic
+  - Respiratory
+  - General health
+
+## Risk Assessment
+- Evaluates symptom severity
+- Provides explainable risk classification
+
+## RAG-Based Medical Knowledge Retrieval
+- Retrieves relevant healthcare information
+- Improves response accuracy
+- Reduces hallucination
+
+## Patient Report Management
+- Stores generated reports
+- Allows previous assessment history tracking
+
+---
+# System Architecture
+<img width="907" height="608" alt="image" src="https://github.com/user-attachments/assets/7144eecf-f6d6-4c40-ab76-298d1c949f51" />
+
+Main components:
+
+- Frontend Layer
+  - React + Vite
+  - User interaction interface
+
+- Backend Layer
+  - FastAPI APIs
+  - Request processing
+  - Agent orchestration
+
+- AI Layer
+  - Symptom Agent
+  - Clarification Agent
+  - Risk Agent
+  - Recommendation Agent
+
+- Knowledge Layer
+  - Medical knowledge base
+  - Vector search
+  - Context retrieval
+
+---
+
+# Multi-Agent Workflow
+
+User enters symptoms:
+
+Example:
+"I have fever, headache and body pain for 2 days."
+
+Flow:
+
+1. Symptom Agent extracts:
+   - Symptoms
+   - Duration
+   - Severity
+   - Context
+
+2. Clarification Agent asks:
+   - Additional relevant questions
+
+3. Reasoning Agent:
+   - Analyzes possible conditions
+
+4. Risk Agent:
+   - Calculates severity level
+
+5. Recommendation Agent:
+   - Generates final structured report
+
+
+Output:
+
+- Symptom summary
+- Possible conditions
+- Risk level
+- Recommended next steps
+
+---
+
+# Microsoft Foundry IQ Integration
+
+Microsoft Foundry IQ acts as the knowledge grounding layer of Agentic Health Monitor.
+
+It enables AI agents to retrieve relevant healthcare information from curated knowledge sources before generating responses.
+
+Foundry IQ helps the system:
+
+- Retrieve trusted medical knowledge
+- Provide context-aware responses
+- Reduce AI hallucinations
+- Improve explainability
+- Support grounded reasoning
+
+The agent workflow uses retrieved knowledge to generate more reliable healthcare insights.
+
+Knowledge Flow:
+
+Medical Knowledge Base
+        ↓
+Foundry IQ Retrieval
+        ↓
+AI Agents
+        ↓
+Explainable Clinical Report
+
+
+---
+
+# Responsible AI & Safety
+
+This project follows responsible AI principles for healthcare applications.
+
+Key considerations:
+
+- Provides healthcare decision support, not medical diagnosis
+- Encourages consultation with qualified healthcare professionals
+- Uses synthetic/demo healthcare data only
+- Avoids storing sensitive patient information
+- Uses knowledge grounding to reduce incorrect outputs
+- Provides transparent AI-generated reasoning
+- Keeps humans in the loop for final decisions
+
+---
+
+# Tech Stack
+
+## Backend
+
+- FastAPI
+- Python
+- Groq LLM (llama-3.3-70b-versatile)
+- Pydantic
+- SQLite
+
+## AI / Knowledge
+
+- Multi-Agent Architecture
+- Retrieval-Augmented Generation (RAG)
+- ChromaDB Vector Database
+- Microsoft Foundry IQ
+
+## Frontend
+
+- React
+- Vite
+- Tailwind CSS
+
+---
+
 
 ## Project Structure
 
