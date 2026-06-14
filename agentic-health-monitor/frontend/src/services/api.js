@@ -8,13 +8,32 @@ const handleResponse = async (response) => {
   return json
 }
 
+// Normalise analysis response — ensures new fields always exist with safe defaults
+// so pages written before the backend upgrade never crash on missing keys.
+export const normalizeAnalysis = (data = {}) => ({
+  ...data,
+  agent_trace:        data.agent_trace        ?? [],
+  interpretation:     data.interpretation     ?? null,
+  emergency_alert:    data.emergency_alert     ?? false,
+  knowledge_sources:  data.knowledge_sources  ?? [],
+  relevant_knowledge: data.relevant_knowledge ?? [],
+  follow_up_questions: data.follow_up_questions ?? [],
+})
+
+export const normalizeFinalAssessment = (data = {}) => ({
+  ...data,
+  agent_trace:       data.agent_trace       ?? [],
+  diagnosis_result:  data.diagnosis_result  ?? null,
+  knowledge_sources: data.knowledge_sources ?? [],
+})
+
 export const analyzeSymptoms = async (payload) => {
   const response = await fetch(`${API_URL}/analyze-symptoms`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   })
-  return handleResponse(response)
+  return normalizeAnalysis(await handleResponse(response))
 }
 
 export const finalAssessment = async (payload) => {
@@ -23,7 +42,7 @@ export const finalAssessment = async (payload) => {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   })
-  return handleResponse(response)
+  return normalizeFinalAssessment(await handleResponse(response))
 }
 
 export const saveReport = async (payload) => {

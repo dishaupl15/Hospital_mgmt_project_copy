@@ -7,14 +7,170 @@ import { generateReportPDF } from '../services/generatePDF.js'
 import { shareReport } from '../services/api.js'
 
 const riskConfig = {
-  Emergency: { color: '#f87171', bg: 'rgba(239,68,68,0.15)', border: 'rgba(239,68,68,0.3)', dot: '#f87171', icon: '🚨' },
-  High:      { color: '#fb923c', bg: 'rgba(249,115,22,0.15)', border: 'rgba(249,115,22,0.3)', dot: '#fb923c', icon: '⚠️' },
-  Medium:    { color: '#fbbf24', bg: 'rgba(245,158,11,0.15)', border: 'rgba(245,158,11,0.3)', dot: '#fbbf24', icon: '🔶' },
-  Low:       { color: '#34d399', bg: 'rgba(16,185,129,0.15)', border: 'rgba(16,185,129,0.3)', dot: '#34d399', icon: '✅' },
+  Emergency: { color: '#f87171', bg: 'rgba(239,68,68,0.15)', border: 'rgba(239,68,68,0.3)', icon: '🚨' },
+  High:      { color: '#fb923c', bg: 'rgba(249,115,22,0.15)', border: 'rgba(249,115,22,0.3)', icon: '⚠️' },
+  Medium:    { color: '#fbbf24', bg: 'rgba(245,158,11,0.15)', border: 'rgba(245,158,11,0.3)', icon: '🔶' },
+  Low:       { color: '#34d399', bg: 'rgba(16,185,129,0.15)', border: 'rgba(16,185,129,0.3)', icon: '✅' },
+}
+
+const riskExplanation = {
+  Emergency: 'Immediate medical attention is recommended. Symptoms are consistent with a possible emergency and should not be ignored.',
+  High: 'High risk indicators are present. Advise prompt follow-up with a qualified provider.',
+  Medium: 'Moderate risk has been detected. Monitor symptoms and consult a healthcare provider as needed.',
+  Low: 'Low-risk assessment. Continue routine care and re-evaluate if symptoms change.',
 }
 
 const cardStyle = { background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '1rem' }
 const innerCard = { background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '0.75rem' }
+
+// ── New Phase 3 helper components ─────────────────────────────────────────────
+
+function EmergencyAlert({ emergency_alert }) {
+  if (emergency_alert) {
+    return (
+      <div className="flex items-start gap-4 rounded-2xl p-5"
+        style={{ background: 'rgba(239,68,68,0.15)', border: '2px solid rgba(248,113,113,0.5)' }}>
+        <span className="text-3xl shrink-0">🚨</span>
+        <div>
+          <p className="text-base font-black text-red-400 mb-1">EMERGENCY ALERT</p>
+          <p className="text-sm text-red-200 leading-relaxed">
+            The AI has detected symptoms consistent with a possible medical emergency.
+            Please call emergency services (911) immediately or go to the nearest emergency room.
+            Do not wait — time-sensitive conditions require immediate attention.
+          </p>
+        </div>
+      </div>
+    )
+  }
+  return (
+    <div className="flex items-center gap-3 rounded-xl px-4 py-3"
+      style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(52,211,153,0.2)' }}>
+      <span className="text-lg">✅</span>
+      <p className="text-sm text-emerald-400">No immediate emergency indicators detected.</p>
+    </div>
+  )
+}
+
+function ConditionSection({ possible_conditions }) {
+  const conditions = normalizeScores(possible_conditions)
+  if (!conditions.length) {
+    return (
+      <div className="rounded-3xl border border-slate-800 bg-slate-950/80 p-6" style={cardStyle}>
+        <p className="text-sm text-slate-400">No structured conditions were generated for this report.</p>
+      </div>
+    )
+  }
+  return (
+    <div className="rounded-3xl border border-slate-800 bg-slate-950/80 p-6" style={cardStyle}>
+      <div className="flex items-center justify-between gap-4 mb-4">
+        <div>
+          <p className="text-xs uppercase tracking-[0.24em] text-slate-500 mb-2">Possible Conditions</p>
+          <p className="text-xl font-semibold text-white">Clinical differential</p>
+        </div>
+        <span className="text-xs uppercase tracking-[0.24em] text-slate-400">{conditions.length} conditions</span>
+      </div>
+      <div className="space-y-4">
+        {conditions.map((condition, index) => (
+          <div key={index} className="rounded-3xl border border-slate-800 bg-slate-950/80 p-5" style={innerCard}>
+            <div className="flex items-center justify-between gap-3 mb-3">
+              <div>
+                <p className="text-sm font-semibold text-white">{condition.name}</p>
+                <p className="text-xs text-slate-500">{condition.reason || 'No reasoning text provided.'}</p>
+              </div>
+              <span className="rounded-full px-3 py-2 text-xs font-semibold" style={{ background: condition.pct >= 60 ? 'rgba(239,68,68,0.15)' : condition.pct >= 35 ? 'rgba(245,158,11,0.15)' : 'rgba(52,211,153,0.15)', color: condition.pct >= 60 ? '#f87171' : condition.pct >= 35 ? '#fbbf24' : '#34d399' }}>
+                Confidence: {condition.pct}%
+              </span>
+            </div>
+            {condition.supporting_symptoms?.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {condition.supporting_symptoms.map((symptom, idx) => (
+                  <span key={idx} className="text-xs rounded-full px-3 py-1" style={{ background: 'rgba(255,255,255,0.06)', color: '#94a3b8', border: '1px solid rgba(255,255,255,0.1)' }}>
+                    {symptom}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function KnowledgeGrounding({ knowledge_sources }) {
+  const sources = Array.from(new Set((knowledge_sources || []).map((item) => item.source).filter(Boolean)))
+  const topics = Array.from(new Set((knowledge_sources || []).map((item) => item.topic || item.source).filter(Boolean)))
+  return (
+    <div className="rounded-3xl border border-slate-800 bg-slate-950/80 p-6" style={cardStyle}>
+      <div className="mb-4">
+        <p className="text-xs uppercase tracking-[0.24em] text-slate-500 mb-2">Knowledge Grounding</p>
+        <p className="text-xl font-semibold text-white">Sources used by AI</p>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className="rounded-3xl border border-slate-800 bg-slate-950/80 p-4" style={innerCard}>
+          <p className="text-xs uppercase tracking-[0.22em] text-slate-400 mb-3">Sources</p>
+          {sources.length > 0 ? (
+            <ul className="space-y-2 text-sm text-slate-300">
+              {sources.map((source, index) => (
+                <li key={index} className="truncate">• {source}</li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-sm text-slate-500">No source metadata is available for this report.</p>
+          )}
+        </div>
+        <div className="rounded-3xl border border-slate-800 bg-slate-950/80 p-4" style={innerCard}>
+          <p className="text-xs uppercase tracking-[0.22em] text-slate-400 mb-3">Topics retrieved</p>
+          {topics.length > 0 ? (
+            <div className="flex flex-wrap gap-2">
+              {topics.map((topic, index) => (
+                <span key={index} className="text-xs rounded-full px-3 py-1" style={{ background: 'rgba(6,148,162,0.12)', color: '#7edce2', border: '1px solid rgba(22,189,202,0.2)' }}>
+                  {topic}
+                </span>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-slate-500">No grounding topics were retrieved.</p>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function AgentContribution({ agent_trace, navigate, state }) {
+  if (!agent_trace?.length) {
+    return (
+      <div className="rounded-3xl border border-slate-800 bg-slate-950/80 p-6" style={cardStyle}>
+        <p className="text-sm text-slate-400">Agent contribution details are not available for this report.</p>
+      </div>
+    )
+  }
+  const completed = agent_trace.filter((item) => item.status === 'completed').length
+  const failed = agent_trace.filter((item) => item.status === 'failed').length
+  return (
+    <div className="rounded-3xl border border-slate-800 bg-slate-950/80 p-6" style={cardStyle}>
+      <div className="flex items-center justify-between gap-4 mb-4">
+        <div>
+          <p className="text-xs uppercase tracking-[0.24em] text-slate-500 mb-2">Agent Contribution</p>
+          <p className="text-xl font-semibold text-white">Execution summary</p>
+        </div>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-3">
+        {[
+          { label: 'Total agents executed', value: agent_trace.length },
+          { label: 'Successful agents', value: completed },
+          { label: 'Failed / skipped', value: `${failed} / ${agent_trace.length - completed - failed}` },
+        ].map((item) => (
+          <div key={item.label} className="rounded-3xl border border-slate-800 bg-slate-950/80 p-4" style={innerCard}>
+            <p className="text-xs uppercase tracking-[0.22em] text-slate-500 mb-2">{item.label}</p>
+            <p className="text-2xl font-semibold text-white">{item.value}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
 
 function normalizeScores(conditions) {
   if (!conditions?.length) return []
@@ -150,6 +306,9 @@ export default function Report() {
           </div>
         </div>
 
+        {/* Emergency Alert */}
+        <EmergencyAlert emergency_alert={report.emergency_alert} />
+
         {/* Conditions + Explanation */}
         <div className="grid gap-6 lg:grid-cols-2">
           <div className="p-6" style={cardStyle}>
@@ -231,6 +390,12 @@ export default function Report() {
             )}
           </div>
         </div>
+
+        {/* Knowledge Grounding */}
+        <KnowledgeGrounding knowledge_sources={report.knowledge_sources} />
+
+        {/* Agent Execution Summary */}
+        <AgentContribution agent_trace={report.agent_trace} navigate={navigate} state={state} />
 
         {/* Follow-up answers */}
         {Object.keys(followUpAnswers).length > 0 && (
@@ -319,6 +484,9 @@ export default function Report() {
 
           <button onClick={() => navigate('/history')} className="btn-secondary px-6 py-3.5">{t('report.viewHistory')}</button>
           <button onClick={() => navigate('/symptom-form')} className="btn-secondary px-6 py-3.5">{t('report.newAssessment')}</button>
+          <button onClick={() => navigate('/agent-flow', { state })} className="btn-secondary px-6 py-3.5 flex items-center gap-2">
+            🤖 Agent Workflow
+          </button>
         </div>
       </div>
     </PageShell>

@@ -37,7 +37,15 @@ def build_collection(force_reindex: bool = False):
 
         if chunks:
             ids = [chunk["id"] for chunk in chunks]
-            metadatas = [{"source": chunk["source"]} for chunk in chunks]
+            metadatas = [
+                {
+                    "source":    chunk.get("source", ""),
+                    "category":  chunk.get("category", "general"),
+                    "condition": chunk.get("condition", ""),
+                    "type":      chunk.get("type", "medical_knowledge"),
+                }
+                for chunk in chunks
+            ]
             documents = [chunk["text"] for chunk in chunks]
             embeddings = create_embeddings(documents)
 
@@ -71,12 +79,16 @@ def query_similar_chunks(query: str, top_k: int = 3) -> List[Dict[str, object]]:
     for idx, (id_value, doc, metadata, distance) in enumerate(
         zip(ids, documents, metadatas, distances)
     ):
+        meta = metadata if isinstance(metadata, dict) else {}
         output.append(
             {
-                "id": id_value if id_value is not None else f"result_{idx}",
-                "source": metadata.get("source", "") if isinstance(metadata, dict) else "",
-                "text": doc,
-                "score": 1.0 - distance if distance is not None else 0.0,
+                "id":        id_value if id_value is not None else f"result_{idx}",
+                "source":    meta.get("source", ""),
+                "category":  meta.get("category", "general"),
+                "condition": meta.get("condition", ""),
+                "type":      meta.get("type", "medical_knowledge"),
+                "text":      doc,
+                "score":     1.0 - distance if distance is not None else 0.0,
             }
         )
 

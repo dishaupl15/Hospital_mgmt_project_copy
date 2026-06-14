@@ -13,6 +13,7 @@ export default function PageShell({ title, description, children }) {
     { to: '/dashboard', label: t('nav.dashboard') },
     { to: '/symptom-form', label: t('nav.newAssessment') },
     { to: '/history', label: t('nav.history') },
+    { to: '/agent-flow', label: 'Agent Workflow' },
   ]
 
   const handleLogout = async () => {

@@ -9,6 +9,7 @@ import Login from './pages/Login.jsx'
 import ProtectedRoute from './components/ProtectedRoute.jsx'
 import Dashboard from './pages/Dashboard.jsx'
 import SharedReport from './pages/SharedReport.jsx'
+import AgentFlow from './pages/AgentFlow.jsx'
 
 export default function App() {
   return (
@@ -22,6 +23,7 @@ export default function App() {
       <Route path="/follow-up" element={<ProtectedRoute><FollowUp /></ProtectedRoute>} />
       <Route path="/report" element={<ProtectedRoute><Report /></ProtectedRoute>} />
       <Route path="/history" element={<ProtectedRoute><History /></ProtectedRoute>} />
+      <Route path="/agent-flow" element={<ProtectedRoute><AgentFlow /></ProtectedRoute>} />
     </Routes>
   )
 }
