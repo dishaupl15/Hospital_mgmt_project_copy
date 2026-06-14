@@ -86,8 +86,8 @@ export default function AgentFlow() {
   const state = location.state
 
   // Accept traces from either analyze or final assessment navigation state
-  const analyzeTrace  = state?.analysis?.agent_trace  || []
-  const assessTrace   = state?.report?.agent_trace    || []
+  const analyzeTrace  = state?.analysis?.agent_trace || state?.report?.analysis?.agent_trace || []
+  const assessTrace   = state?.report?.agent_trace || state?.agent_trace || []
   const allTraces     = [...analyzeTrace, ...assessTrace]
 
   // Build a lookup: agent_name → trace object (last one wins if duplicated)

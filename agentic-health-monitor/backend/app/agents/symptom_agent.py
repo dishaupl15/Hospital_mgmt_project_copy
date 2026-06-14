@@ -4,7 +4,7 @@ Symptom Interpreter + Symptom Summarizer agents.
 """
 import logging
 from typing import List, Literal, Optional, Tuple
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from app.core.llm import chat_structured
 from app.tools.rag_tool import retrieve_as_context
 
@@ -16,9 +16,21 @@ logger = logging.getLogger(__name__)
 class SymptomInterpretation(BaseModel):
     possible_conditions: List[str] = Field(description="2-5 possible medical conditions.")
     body_system: str = Field(description="Primary body system: cardiac, neurological, hepatic, respiratory, gastrointestinal, endocrine, musculoskeletal, general.")
-    risk_level: Literal["low", "moderate", "high", "emergency"]
+    risk_level: str = Field(description="Risk level: low, moderate, high, emergency.")
     symptom_cluster: str = Field(description="One-sentence description of the symptom cluster pattern.")
     is_emergency: bool
+
+    @field_validator("body_system", mode="before")
+    def normalize_body_system(cls, value):
+        if isinstance(value, str):
+            return value.strip().lower()
+        return value
+
+    @field_validator("risk_level", mode="before")
+    def normalize_risk_level(cls, value):
+        if isinstance(value, str):
+            return value.strip().lower()
+        return value
 
 
 _INTERPRETER_SYSTEM = """\
@@ -65,10 +77,14 @@ def interpret_symptoms(
     except Exception as exc:
         logger.warning("[SymptomInterpreter] LLM failed (%s) - using safe fallback.", exc)
         print("[SYMPTOM INTERPRETER] FAILED: " + str(exc) + " - fallback used")
+        normalized = symptoms.lower()
+        fallback_risk = "moderate"
+        if any(term in normalized for term in ["mild", "occasional", "minor", "improving"]):
+            fallback_risk = "low"
         return SymptomInterpretation(
             possible_conditions=["unspecified condition"],
             body_system="general",
-            risk_level="moderate",
+            risk_level=fallback_risk,
             symptom_cluster=symptoms[:120],
             is_emergency=False,
         )
@@ -159,13 +175,39 @@ def summarize_symptoms(
     except Exception as exc:
         logger.warning("[SymptomSummarizer] LLM failed (%s) - using fallback.", exc)
         print("[SYMPTOM SUMMARIZER] FAILED: " + str(exc) + " - fallback used")
-        return _generic_summary(symptoms, duration, severity, temperature), True, []
+        follow_up = _should_generate_follow_up(symptoms, severity, temperature)
+        return _generic_summary(symptoms, duration, severity, temperature), follow_up, []
 
 
 def _generic_summary(symptoms: str, duration: str, severity: str, temperature: Optional[str]) -> str:
     temp_note = " with a recorded temperature of " + temperature if temperature else ""
+    severity_label = severity.lower()
+    if severity_label in ["low", "mild"]:
+        return (
+            "Patient reports " + symptoms + temp_note + ", lasting " + duration + " with mild severity. "
+            "This presentation appears likely to be self-limiting, but monitor symptoms and seek care if they worsen."
+        )
+    if severity_label in ["moderate", "medium"]:
+        return (
+            "Patient reports " + symptoms + temp_note + ", lasting " + duration + " with moderate severity. "
+            "This presentation may require medical evaluation if symptoms persist or worsen."
+        )
     return (
-        "Patient reports " + symptoms + temp_note + ", lasting " + duration + " with " + severity + " severity. "
-        "This presentation warrants clinical evaluation. "
-        "Follow-up questions have been generated to better assess the situation."
+        "Patient reports " + symptoms + temp_note + ", lasting " + duration + " with severe symptoms. "
+        "This presentation may require prompt medical evaluation."
     )
+
+
+def _contains_any(text: str, keywords: List[str]) -> bool:
+    lowered = text.lower()
+    return any(word in lowered for word in keywords)
+
+
+def _should_generate_follow_up(symptoms: str, severity: str, temperature: Optional[str]) -> bool:
+    severity_label = severity.lower()
+    if severity_label in ["low", "mild"]:
+        combined = " ".join(filter(None, [symptoms, temperature or ""]))
+        if _contains_any(combined, ["severe", "sudden", "blood", "difficulty breathing", "chest pain", "vomit"]):
+            return True
+        return False
+    return True

@@ -32,12 +32,20 @@ export default function FollowUp() {
     setLoading(true)
     setError('')
     try {
+      const answersByQuestion = questions.reduce((acc, question, index) => {
+        const fieldKey = `question_${index}`
+        const answer = answers[fieldKey]?.trim()
+        if (answer) acc[question] = answer
+        return acc
+      }, {})
+
       const response = await finalAssessment({
         original_data: form,
-        follow_up_answers: answers,
+        follow_up_answers: answersByQuestion,
         symptom_summary: payload?.analysis?.symptom_summary || '',
+        interpretation: payload?.analysis?.interpretation,
       })
-      navigate('/report', { state: { report: response, form, follow_up_answers: answers } })
+      navigate('/report', { state: { report: response, form, follow_up_answers: answersByQuestion, analysis: payload.analysis } })
     } catch (err) {
       setError(err.message || t('common.assessmentError'))
     } finally {

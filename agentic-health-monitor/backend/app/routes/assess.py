@@ -15,6 +15,7 @@ def final_assessment(payload: FinalAssessmentRequest):
             original_data=payload.original_data,
             follow_up_answers=payload.follow_up_answers,
             symptom_summary=payload.symptom_summary,
+            interpretation=payload.interpretation,
         )
     except Exception as exc:
         logger.error("final_assessment failed: %s", exc, exc_info=True)

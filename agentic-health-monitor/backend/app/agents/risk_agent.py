@@ -37,9 +37,9 @@ You are a clinical risk assessment AI. Reason over the full patient case.
 Rules:
 - Never state a definitive diagnosis. Use: may suggest, consistent with, could indicate.
 - Acknowledge overlapping symptoms and uncertainty in the explanation.
-- When information is incomplete, lean toward higher risk.
+- When information is incomplete, balance caution with the likelihood of mild illness. Do not over-triage every case.
 - Use retrieved medical context to ground your reasoning.
-- Over-triage rather than under-triage.
+- Prioritize accurate risk level assignment over always choosing the highest severity.
 
 Risk levels: Emergency=life-threatening, High=24h, Medium=3 days, Low=home care.
 
@@ -54,6 +54,105 @@ You MUST respond with ONLY this exact JSON structure, no extra text:
   "urgency": "<Routine monitoring|Within 3 days|Within 24 hours|Immediate>",
   "explanation": "<2-3 sentence clinical explanation>"
 }"""
+
+
+_EMERGENCY_TERMS = [
+    "chest pain",
+    "shortness of breath",
+    "difficulty breathing",
+    "sudden weakness",
+    "numbness",
+    "slurred speech",
+    "severe abdominal pain",
+    "heavy bleeding",
+    "possible stroke",
+    "possible heart attack",
+    "loss of consciousness",
+    "sepsis",
+    "anaphylaxis",
+]
+
+_HIGH_RISK_TERMS = [
+    "severe",
+    "worst ever",
+    "sudden onset",
+    "uncontrolled",
+    "fainting",
+    "blood in",
+    "bleeding",
+    "vomit",
+    "dehydration",
+    "rapid heart",
+    "palpitations",
+]
+
+_MEDIUM_RISK_TERMS = [
+    "moderate",
+    "persistent",
+    "worsening",
+    "fever",
+    "nausea",
+    "dizziness",
+    "weakness",
+]
+
+_LOW_RISK_TERMS = [
+    "mild",
+    "occasional",
+    "minor",
+    "improving",
+    "better",
+    "stable",
+]
+
+
+def _normalize_text(*parts: str) -> str:
+    return " ".join(part.strip().lower() for part in parts if part).strip()
+
+
+def _contains_any(text: str, terms: list[str]) -> bool:
+    lowered = text.lower()
+    return any(term in lowered for term in terms)
+
+
+def _infer_risk_from_case(
+    symptoms: str,
+    duration: str,
+    severity: str,
+    answers: str,
+    summary: str,
+) -> tuple[str, str, str]:
+    content = _normalize_text(symptoms, duration, severity, answers, summary)
+    severity_key = severity.strip().lower()
+
+    if _contains_any(content, _EMERGENCY_TERMS):
+        return "Emergency", "Immediate", "High"
+
+    if severity_key in ["critical", "severe", "high"] or _contains_any(content, _HIGH_RISK_TERMS):
+        return "High", "Within 24 hours", "Moderate"
+
+    if severity_key in ["moderate", "medium"] or _contains_any(content, _MEDIUM_RISK_TERMS):
+        return "Medium", "Within 3 days", "Moderate"
+
+    if severity_key in ["low", "mild"] or _contains_any(content, _LOW_RISK_TERMS):
+        return "Low", "Routine monitoring", "Low"
+
+    return "Medium", "Within 3 days", "Moderate"
+
+
+def _infer_condition_from_symptoms(symptoms: str, summary: str) -> str:
+    content = _normalize_text(symptoms, summary)
+    if _contains_any(content, ["chest pain", "pressure", "tightness", "shortness of breath", "palpitations"]):
+        return "Possible cardiac or respiratory condition"
+    if _contains_any(content, ["nausea", "vomiting", "diarrhea", "abdominal pain", "stomach pain", "indigestion"]):
+        return "Possible gastrointestinal condition"
+    if _contains_any(content, ["headache", "dizziness", "confusion", "weakness", "numbness"]):
+        return "Possible neurological condition"
+    if _contains_any(content, ["fever", "cough", "chills", "sore throat", "shortness of breath"]):
+        return "Possible infection or respiratory condition"
+    if _contains_any(content, ["joint", "muscle", "back pain", "sprain", "strain"]):
+        return "Possible musculoskeletal condition"
+    return "Unspecified condition"
 
 
 def assess_risk(
@@ -97,11 +196,36 @@ def assess_risk(
     except Exception as exc:
         logger.warning("[RiskAgent] LLM failed (%s) - using safe fallback.", exc)
         print("[RISK AGENT] FAILED: " + str(exc) + " - fallback used")
+        risk_level, urgency, confidence = _infer_risk_from_case(
+            symptoms=symptoms,
+            duration=duration,
+            severity=severity,
+            answers=answers_text,
+            summary=summary,
+        )
+        condition_name = _infer_condition_from_symptoms(symptoms, summary)
+        explanation = {
+            "Emergency": (
+                "The reported symptoms are potentially life-threatening and require immediate medical attention. "
+                "Seek emergency care right away."
+            ),
+            "High": (
+                "The case appears concerning and should be evaluated by a clinician within 24 hours. "
+                "Please seek prompt medical attention."
+            ),
+            "Medium": (
+                "The symptoms are not clearly life-threatening but warrant evaluation within a few days if they persist or worsen. "
+                "Monitor the situation closely."
+            ),
+            "Low": (
+                "The presentation appears to be mild and may be monitored at home unless symptoms worsen. "
+                "Seek care if new concerning signs develop."
+            ),
+        }[risk_level]
         return (
-            [ConditionItem(name="Unspecified condition", score=0.5)],
-            "Low",
-            "High",
-            "Within 24 hours",
-            "Unable to complete automated risk assessment. Symptoms reported: " + symptoms + ". "
-            "Please consult a healthcare provider promptly.",
+            [ConditionItem(name=condition_name, score=0.6)],
+            confidence,
+            risk_level,
+            urgency,
+            explanation,
         )

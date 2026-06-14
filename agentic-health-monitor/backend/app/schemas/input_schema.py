@@ -4,7 +4,7 @@ Request body models for FastAPI routes.
 """
 from typing import Dict, List, Optional
 from pydantic import BaseModel, Field
-from app.schemas.output_schema import ConditionItem
+from app.schemas.output_schema import ConditionItem, SymptomInterpretationResult
 
 
 class SymptomFormInput(BaseModel):
@@ -28,6 +28,10 @@ class FinalAssessmentRequest(BaseModel):
     symptom_summary: Optional[str] = Field(
         default=None,
         description="Clinical summary from the Symptom Agent, passed through from /analyze-symptoms.",
+    )
+    interpretation: Optional[SymptomInterpretationResult] = Field(
+        default=None,
+        description="Structured interpretation from symptom analysis, used to improve diagnosis and grounding.",
     )
 
 

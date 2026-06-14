@@ -281,6 +281,7 @@ def final_assessment_workflow(
     original_data: SymptomFormInput,
     follow_up_answers: Dict[str, str],
     symptom_summary: Optional[str] = None,
+    interpretation: Optional[SymptomInterpretationResult] = None,
 ) -> FinalAssessmentResponse:
     print("\n" + "="*60)
     print("[ORCHESTRATOR] final_assessment_workflow CALLED")
@@ -301,7 +302,7 @@ def final_assessment_workflow(
     try:
         knowledge = retrieve_medical_knowledge(
             symptoms=original_data.symptoms,
-            possible_conditions=[],   # interpreter not re-run here; use symptoms alone
+            possible_conditions=interpretation.possible_conditions if interpretation else [],
             top_k=4,
         )
         dur = _ms(t)
@@ -323,10 +324,12 @@ def final_assessment_workflow(
     action_2 = "Produce structured differential diagnosis from full patient case"
     t = _log_start("DiagnosisReasoningAgent", action_2)
     try:
+        body_system = interpretation.body_system if interpretation else "general"
+        possible_conditions_from_interpreter = interpretation.possible_conditions if interpretation else []
         diag = run_diagnosis(
             symptoms=original_data.symptoms,
-            body_system="general",          # interpreter output not stored in request; use general
-            possible_conditions_from_interpreter=[],
+            body_system=body_system,
+            possible_conditions_from_interpreter=possible_conditions_from_interpreter,
             follow_up_answers=follow_up_answers,
             medical_context=medical_context,
             age=original_data.age,

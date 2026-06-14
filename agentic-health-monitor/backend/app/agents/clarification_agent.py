@@ -61,6 +61,11 @@ def generate_follow_up_questions(
     print("  symptoms : " + symptoms)
 
     if interpretation:
+        inferred_body_system = _infer_body_system_from_symptoms(symptoms)
+        if interpretation.body_system.lower() == "general" and inferred_body_system != "general":
+            print("  inferred body_system from symptoms: " + inferred_body_system)
+            interpretation = interpretation.model_copy(update={"body_system": inferred_body_system})
+
         print("  body_system : " + interpretation.body_system)
         print("  conditions  : " + str(interpretation.possible_conditions))
         print("  risk_level  : " + interpretation.risk_level)
@@ -117,21 +122,32 @@ def generate_follow_up_questions(
 
             questions = [str(q).strip() for q in questions if q and str(q).strip()]
 
-            if len(questions) < 3:
+            if len(questions) < 5:
                 raise ValueError("Too few questions: " + str(len(questions)))
+
+            if interpretation and interpretation.body_system.lower() != "general":
+                focused_terms = _focus_terms_for_system(interpretation.body_system.lower())
+                focused_count = sum(
+                    any(term in q.lower() for term in focused_terms)
+                    for q in questions
+                )
+                if focused_count < 3:
+                    raise ValueError(
+                        "Generated follow-up questions are too generic for body system " + interpretation.body_system
+                    )
 
             print("[CLARIFICATION AGENT] OK - " + str(len(questions)) + " questions:")
             for i, q in enumerate(questions, 1):
                 print("  " + str(i) + ". " + q)
             print("="*55)
-            return questions[:6]
+            return questions[:5]
 
         except Exception as exc:
             print("[CLARIFICATION AGENT] Attempt " + str(attempt) + " failed: " + str(exc))
             logger.warning("[ClarificationAgent] attempt %d failed: %s", attempt, exc)
 
     print("[CLARIFICATION AGENT] All LLM attempts failed - using body-system fallback")
-    fallback = _body_system_fallback(interpretation)
+    fallback = _body_system_fallback(interpretation, symptoms)
     print("[CLARIFICATION AGENT] fallback (" + str(len(fallback)) + " questions):")
     for i, q in enumerate(fallback, 1):
         print("  " + str(i) + ". " + q)
@@ -139,15 +155,49 @@ def generate_follow_up_questions(
     return fallback
 
 
-def _body_system_fallback(interpretation: Optional[SymptomInterpretation]) -> List[str]:
+def _infer_body_system_from_symptoms(symptoms: str) -> str:
+    text = symptoms.lower()
+    mappings = {
+        "cardiac": ["chest pain", "shortness of breath", "sob", "palpitations", "left arm", "jaw", "pressure", "tightness", "sweating", "heart", "angina"],
+        "neurological": ["weakness", "numb", "difficulty speaking", "slurred speech", "blurred vision", "seizure", "headache", "dizziness", "face droop", "numbness", "confusion", "tingling"],
+        "hepatic": ["jaundice", "yellow", "dark urine", "pale stool", "liver", "right side pain", "itching", "abdominal pain", "upper right"],
+        "respiratory": ["cough", "wheezing", "breathing", "breathless", "sputum", "chest tightness", "respiratory", "asthma", "pneumonia", "shortness"],
+        "gastrointestinal": ["abdominal", "stomach", "nausea", "vomit", "diarrhea", "constipation", "bloody stool", "bloating", "heartburn", "indigestion", "gastric"],
+        "endocrine": ["thirst", "urination", "blood sugar", "diabetes", "weight loss", "weight gain", "fatigue", "thyroid", "hormone", "cold intolerance"],
+        "musculoskeletal": ["joint", "swelling", "back pain", "muscle", "injury", "trauma", "stiffness", "sprain", "strain", "bone"],
+    }
+
+    for system, keywords in mappings.items():
+        if any(keyword in text for keyword in keywords):
+            return system
+    return "general"
+
+
+def _focus_terms_for_system(system: str) -> list:
+    return {
+        "cardiac": ["chest", "heart", "arm", "jaw", "back", "pressure", "sweat", "palpitation"],
+        "neurological": ["face", "arm", "leg", "speech", "vision", "headache", "weakness", "numb"],
+        "hepatic": ["jaundice", "urine", "stool", "liver", "upper right", "alcohol"],
+        "respiratory": ["breath", "cough", "wheeze", "sputum", "asthma", "lung", "fever"],
+        "gastrointestinal": ["abdominal", "stomach", "nausea", "vomit", "diarrhea", "constipation", "bloating"],
+        "endocrine": ["sugar", "diabetes", "thirst", "urination", "weight", "fatigue", "thyroid"],
+        "musculoskeletal": ["joint", "swelling", "back", "muscle", "injury", "pain", "movement"],
+    }.get(system, [])
+
+
+def _body_system_fallback(
+    interpretation: Optional[SymptomInterpretation],
+    symptoms: str,
+) -> List[str]:
     if not interpretation:
-        return [
-            "Can you describe exactly where the pain or discomfort is located?",
-            "Did the symptoms start suddenly or come on gradually?",
-            "Are the symptoms constant or do they come and go?",
-            "Have you taken any medication for this, and did it help?",
-            "Do you have any known medical conditions or allergies?",
-        ]
+        inferred = _infer_body_system_from_symptoms(symptoms)
+        interpretation = SymptomInterpretation(
+            possible_conditions=["unspecified condition"],
+            body_system=inferred,
+            risk_level="moderate",
+            symptom_cluster=symptoms[:120],
+            is_emergency=False,
+        )
 
     system = interpretation.body_system.lower()
 

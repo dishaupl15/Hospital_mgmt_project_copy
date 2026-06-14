@@ -150,27 +150,53 @@ def run_diagnosis(
         return _fallback(symptoms, possible_conditions_from_interpreter, body_system)
 
 
+def _infer_conditions(symptoms: str, body_system: str, conditions: List[str]) -> List[str]:
+    normalized = symptoms.lower()
+    if conditions:
+        return conditions[:3]
+    if body_system == "gastrointestinal" or any(k in normalized for k in ["nausea", "vomit", "diarrhea", "abdominal pain", "stomach pain"]):
+        return ["Possible gastrointestinal upset", "Possible food-related illness"]
+    if body_system == "cardiac" or any(k in normalized for k in ["chest pain", "pressure", "palpitations", "shortness of breath"]):
+        return ["Possible cardiac-related condition", "Possible respiratory strain"]
+    if body_system == "neurological" or any(k in normalized for k in ["headache", "dizziness", "confusion", "numbness", "weakness"]):
+        return ["Possible neurological condition", "Possible migraine or tension headache"]
+    if body_system == "respiratory" or any(k in normalized for k in ["cough", "wheeze", "shortness of breath", "sore throat"]):
+        return ["Possible respiratory infection", "Possible upper airway irritation"]
+    if body_system == "musculoskeletal" or any(k in normalized for k in ["joint", "muscle", "back pain", "sprain", "strain"]):
+        return ["Possible musculoskeletal strain", "Possible mild inflammation"]
+    if body_system == "endocrine" or any(k in normalized for k in ["fatigue", "thirst", "urination", "weight"]):
+        return ["Possible metabolic or endocrine imbalance"]
+    return ["Unspecified condition"]
+
+
 def _fallback(
     symptoms: str,
     conditions: List[str],
     body_system: str,
 ) -> DiagnosisOutput:
     """Safe fallback — builds a minimal DiagnosisOutput without any LLM call."""
+    inferred = _infer_conditions(symptoms, body_system, conditions)
     fallback_conditions = [
         DiagnosedCondition(
             name=name,
             confidence="low",
-            reason="This condition may be relevant based on the reported symptoms. Please consult a healthcare provider for a proper evaluation.",
+            reason=(
+                "This condition is suggested based on the symptom pattern and body system, "
+                "but a healthcare provider is needed to confirm it."
+            ),
             supporting_symptoms=[symptoms[:60]] if symptoms else [],
         )
-        for name in (conditions or ["Unspecified condition"])[:3]
+        for name in inferred[:3]
     ]
     return DiagnosisOutput(
         possible_conditions=fallback_conditions,
         reasoning_summary=(
             "Automated diagnostic reasoning could not be completed at this time. "
-            "The symptoms reported are associated with the " + body_system + " system. "
-            "Please consult a qualified healthcare provider for a proper evaluation."
+            "Based on the reported symptoms, these are possible areas to explore: "
+            + ", ".join(inferred[:2])
+            + ". Please consult a qualified healthcare provider for a proper evaluation."
         ),
-        risk_factors=["Unable to determine risk factors — please consult a doctor."],
+        risk_factors=[
+            "Symptom severity and duration were used to estimate risk, but clinical evaluation is needed."
+        ],
     )

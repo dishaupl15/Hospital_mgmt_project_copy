@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { useLocation, useNavigate, Navigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import PageShell from '../components/PageShell.jsx'
@@ -213,7 +213,22 @@ export default function Report() {
   if (!state?.report || !state?.form) return <Navigate to="/" replace />
 
   const { report, form } = state
-  const followUpAnswers = report.follow_up_answers || state.follow_up_answers || {}
+  const followUpAnswers = useMemo(() => {
+    const rawAnswers = report.follow_up_answers || state.follow_up_answers || {}
+    const questions = state?.analysis?.follow_up_questions || report?.follow_up_questions || []
+
+    if (questions.length > 0 && Object.keys(rawAnswers).some((key) => key.startsWith('question_'))) {
+      return questions.reduce((acc, question, index) => {
+        const fieldKey = `question_${index}`
+        if (rawAnswers[fieldKey] !== undefined) {
+          acc[question] = rawAnswers[fieldKey]
+        }
+        return acc
+      }, {})
+    }
+
+    return rawAnswers
+  }, [report, state])
   const risk = riskConfig[report.risk_level] || riskConfig.Low
 
   useEffect(() => {
